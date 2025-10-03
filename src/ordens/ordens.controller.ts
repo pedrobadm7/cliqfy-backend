@@ -77,7 +77,7 @@ export class OrdensController {
   @Get('reports/daily')
   @Roles(UserRole.ADMIN, UserRole.AGENT)
   async getDailyReport() {
-    const response = await fetch('http://localhost:5062/reports/daily');
+    const response = await fetch('http://localhost:5062/api/reports/daily');
     const report = await response.json();
     return report;
   }
