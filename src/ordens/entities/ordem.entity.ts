@@ -18,8 +18,8 @@ export enum OrdemStatus {
 
 @Entity()
 export class Ordem {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
   @Column()
   cliente: string;
@@ -44,14 +44,14 @@ export class Ordem {
   data_conclusao: Date;
 
   @Column()
-  criado_por_id: number;
+  criado_por_id: string;
 
   @ManyToOne(() => User, (user) => user.ordensCriadas, { eager: false })
   @JoinColumn({ name: 'criado_por_id' })
   criadoPor: User;
 
-  @Column({ nullable: true })
-  responsavel_id: number;
+  @Column({ type: 'uuid', nullable: true })
+  responsavel_id: string;
 
   @ManyToOne(() => User, (user) => user.ordensResponsavel, {
     nullable: true,

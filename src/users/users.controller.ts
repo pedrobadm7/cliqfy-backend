@@ -5,7 +5,6 @@ import {
   Delete,
   Get,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   UseInterceptors,
@@ -33,16 +32,14 @@ export class UsersController {
   }
 
   @Get(':id')
-  async findOne(
-    @Param('id', ParseIntPipe) id: number,
-  ): Promise<UserResponseDto> {
+  async findOne(@Param('id') id: string): Promise<UserResponseDto> {
     const user = await this.usersService.findOne(id);
     return user as UserResponseDto;
   }
 
   @Patch(':id')
   async update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
   ): Promise<UserResponseDto> {
     const user = await this.usersService.update(id, updateUserDto);
@@ -50,14 +47,12 @@ export class UsersController {
   }
 
   @Delete(':id')
-  async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+  async remove(@Param('id') id: string): Promise<void> {
     await this.usersService.remove(id);
   }
 
   @Patch(':id/deactivate')
-  async deactivate(
-    @Param('id', ParseIntPipe) id: number,
-  ): Promise<UserResponseDto> {
+  async deactivate(@Param('id') id: string): Promise<UserResponseDto> {
     const user = await this.usersService.softRemove(id);
     return user as UserResponseDto;
   }

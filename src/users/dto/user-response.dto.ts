@@ -4,7 +4,7 @@ import { UserRole } from '../entities/user.entity';
 @Exclude()
 export class UserResponseDto {
   @Expose()
-  id: number;
+  id: string;
 
   @Expose()
   nome: string;

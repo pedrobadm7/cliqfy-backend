@@ -18,16 +18,16 @@ export class OrdensService {
     return this.ordensRepository.find();
   }
 
-  async findOne(id: number): Promise<Ordem> {
+  async findOne(id: string): Promise<Ordem> {
     return this.ordensRepository.findOneBy({ id }) as Promise<Ordem>;
   }
 
-  async update(id: number, ordem: Partial<Ordem>): Promise<Ordem> {
+  async update(id: string, ordem: Partial<Ordem>): Promise<Ordem> {
     await this.ordensRepository.update(id, ordem);
     return this.findOne(id);
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: string): Promise<void> {
     await this.ordensRepository.delete(id);
   }
 }

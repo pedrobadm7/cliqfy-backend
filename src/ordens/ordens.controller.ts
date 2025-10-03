@@ -26,16 +26,16 @@ export class OrdensController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.ordensService.findOne(+id);
+    return this.ordensService.findOne(id);
   }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() ordem: Partial<Ordem>) {
-    return this.ordensService.update(+id, ordem);
+    return this.ordensService.update(id, ordem);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.ordensService.remove(+id);
+    return this.ordensService.remove(id);
   }
 }

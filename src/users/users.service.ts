@@ -42,7 +42,7 @@ export class UsersService {
     });
   }
 
-  async findOne(id: number): Promise<User> {
+  async findOne(id: string): Promise<User> {
     const user = await this.usersRepository.findOne({
       where: { id },
     });
@@ -61,7 +61,7 @@ export class UsersService {
     });
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
+  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
 
     if (updateUserDto.email && updateUserDto.email !== user.email) {
@@ -79,7 +79,7 @@ export class UsersService {
   }
 
   async updateRefreshToken(
-    userId: number,
+    userId: string,
     refreshToken: string | null,
   ): Promise<void> {
     const hashedToken = refreshToken
@@ -91,12 +91,12 @@ export class UsersService {
     });
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
     await this.usersRepository.remove(user);
   }
 
-  async softRemove(id: number): Promise<User> {
+  async softRemove(id: string): Promise<User> {
     const user = await this.findOne(id);
     user.ativo = false;
     return this.usersRepository.save(user);
