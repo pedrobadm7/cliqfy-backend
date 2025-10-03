@@ -15,7 +15,9 @@ import { OrdensModule } from './ordens/ordens.module';
       password: 'cliqfy_password',
       database: 'cliqfy_db',
       entities: [Ordem],
+      migrations: [__dirname + '/src/migrations/*.ts'],
       synchronize: false, //enable only in dev
+      migrationsRun: true,
     }),
     OrdensModule,
   ],
