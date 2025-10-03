@@ -1,4 +1,20 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import { User } from '../../users/entities/user.entity';
+
+export enum OrdemStatus {
+  ABERTA = 'aberta',
+  EM_ANDAMENTO = 'em_andamento',
+  CONCLUIDA = 'concluida',
+  CANCELADA = 'cancelada',
+}
 
 @Entity()
 export class Ordem {
@@ -8,15 +24,39 @@ export class Ordem {
   @Column()
   cliente: string;
 
-  @Column()
+  @Column({ type: 'text' })
   descricao: string;
 
-  @Column({ default: 'aberta' })
-  status: string;
+  @Column({
+    type: 'enum',
+    enum: OrdemStatus,
+    default: OrdemStatus.ABERTA,
+  })
+  status: OrdemStatus;
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn()
   data_criacao: Date;
+
+  @UpdateDateColumn()
+  data_atualizacao: Date;
 
   @Column({ type: 'timestamp', nullable: true })
   data_conclusao: Date;
+
+  @Column()
+  criado_por_id: number;
+
+  @ManyToOne(() => User, (user) => user.ordensCriadas, { eager: false })
+  @JoinColumn({ name: 'criado_por_id' })
+  criadoPor: User;
+
+  @Column({ nullable: true })
+  responsavel_id: number;
+
+  @ManyToOne(() => User, (user) => user.ordensResponsavel, {
+    nullable: true,
+    eager: false,
+  })
+  @JoinColumn({ name: 'responsavel_id' })
+  responsavel: User;
 }
