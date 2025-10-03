@@ -87,7 +87,7 @@ export class UsersService {
       : null;
 
     await this.usersRepository.update(userId, {
-      refreshToken: hashedToken,
+      refreshToken: hashedToken as string,
     });
   }
 
