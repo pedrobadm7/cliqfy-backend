@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:latest
+    container_name: os_api_postgres
+    environment:
+      POSTGRES_USER: cliqfy_user
+      POSTGRES_PASSWORD: cliqfy_password
+      POSTGRES_DB: cliqfy_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
