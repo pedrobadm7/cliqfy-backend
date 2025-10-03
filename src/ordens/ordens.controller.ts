@@ -73,4 +73,12 @@ export class OrdensController {
   checkOut(@Param('id') id: string, @CurrentUser() user: User): Promise<Ordem> {
     return this.ordensService.checkOut(id, user.id);
   }
+
+  @Get('reports/daily')
+  @Roles(UserRole.ADMIN, UserRole.AGENT)
+  async getDailyReport() {
+    const response = await fetch('http://localhost:5062/reports/daily');
+    const report = await response.json();
+    return report;
+  }
 }
