@@ -27,8 +27,8 @@ export class AuthController {
   private setRefreshTokenCookie(res: Response, refreshToken: string): void {
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
   }
@@ -55,7 +55,7 @@ export class AuthController {
 
     this.setRefreshTokenCookie(res, result.refresh_token);
 
-    const { ...response } = result;
+    const { refresh_token, ...response } = result;
     return response;
   }
 

@@ -118,8 +118,8 @@ describe('AuthController', () => {
         'refresh-token',
         {
           httpOnly: true,
-          secure: false, // NODE_ENV não é 'production' no teste
-          sameSite: 'lax',
+          secure: false,
+          sameSite: 'strict',
           maxAge: 7 * 24 * 60 * 60 * 1000,
         },
       );
@@ -167,11 +167,15 @@ describe('AuthController', () => {
         {
           httpOnly: true,
           secure: false,
-          sameSite: 'lax',
+          sameSite: 'strict',
           maxAge: 7 * 24 * 60 * 60 * 1000,
         },
       );
-      expect(result).toEqual(mockAuthResponse);
+      expect(result).toEqual({
+        access_token: 'access-token',
+        user: mockAuthResponse.user,
+      });
+      expect(result).not.toHaveProperty('refresh_token');
     });
 
     it('should handle login errors', async () => {
@@ -318,7 +322,6 @@ describe('AuthController', () => {
         cookie: jest.fn(),
       } as unknown as Response;
 
-      // Acessar o método privado através de casting
       (controller as any).setRefreshTokenCookie(mockRes, 'test-token');
 
       expect(mockRes.cookie).toHaveBeenCalledWith(
@@ -326,8 +329,8 @@ describe('AuthController', () => {
         'test-token',
         {
           httpOnly: true,
-          secure: false,
-          sameSite: 'lax',
+          secure: true,
+          sameSite: 'strict',
           maxAge: 7 * 24 * 60 * 60 * 1000,
         },
       );
@@ -343,7 +346,6 @@ describe('AuthController', () => {
         cookie: jest.fn(),
       } as unknown as Response;
 
-      // Acessar o método privado através de casting
       (controller as any).setRefreshTokenCookie(mockRes, 'test-token');
 
       expect(mockRes.cookie).toHaveBeenCalledWith(
@@ -351,8 +353,8 @@ describe('AuthController', () => {
         'test-token',
         {
           httpOnly: true,
-          secure: true,
-          sameSite: 'lax',
+          secure: false,
+          sameSite: 'strict',
           maxAge: 7 * 24 * 60 * 60 * 1000,
         },
       );
@@ -381,7 +383,6 @@ describe('AuthController', () => {
         },
       } as any;
 
-      // Mock register
       mockAuthService.register.mockResolvedValue(mockAuthResponse);
       const registerResult = await controller.register(
         registerDto,
@@ -389,23 +390,23 @@ describe('AuthController', () => {
       );
       expect(registerResult).not.toHaveProperty('refresh_token');
 
-      // Mock login
       mockAuthService.login.mockResolvedValue(mockAuthResponse);
       const loginResult = await controller.login(loginDto, mockResponse);
-      expect(loginResult).toEqual(mockAuthResponse);
+      expect(loginResult).toEqual({
+        access_token: 'access-token',
+        user: mockAuthResponse.user,
+      });
+      expect(loginResult).not.toHaveProperty('refresh_token');
 
-      // Mock refresh
       const refreshResult = { access_token: 'new-access-token' };
       mockAuthService.refreshToken.mockResolvedValue(refreshResult);
       const refreshResponse = await controller.refresh(mockUser, mockRequest);
       expect(refreshResponse).toEqual(refreshResult);
 
-      // Mock logout
       mockAuthService.logout.mockResolvedValue(undefined);
       const logoutResult = await controller.logout(mockUser, mockResponse);
       expect(logoutResult).toEqual({ message: 'Logout realizado com sucesso' });
 
-      // Verify all service methods were called
       expect(authService.register).toHaveBeenCalledWith(registerDto);
       expect(authService.login).toHaveBeenCalledWith(loginDto);
       expect(authService.refreshToken).toHaveBeenCalledWith(
@@ -414,8 +415,7 @@ describe('AuthController', () => {
       );
       expect(authService.logout).toHaveBeenCalledWith('uuid-123');
 
-      // Verify cookies were set and cleared
-      expect(mockResponse.cookie).toHaveBeenCalledTimes(2); // register + login
+      expect(mockResponse.cookie).toHaveBeenCalledTimes(2);
       expect(mockResponse.clearCookie).toHaveBeenCalledWith('refresh_token');
     });
   });
