@@ -194,7 +194,9 @@ describe('OrdensService', () => {
       const updatedOrdem = { ...mockOrdem, ...updateData } as Ordem;
 
       mockRepository.update.mockResolvedValue(undefined);
-      jest.spyOn(service, 'findOne').mockResolvedValue(updatedOrdem);
+      const findOneSpy = jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue(updatedOrdem);
 
       const result = await service.update('uuid-123', updateData);
 
@@ -202,7 +204,7 @@ describe('OrdensService', () => {
         'uuid-123',
         updateData,
       );
-      expect(jest.spyOn(service, 'findOne')).toHaveBeenCalledWith('uuid-123');
+      expect(findOneSpy).toHaveBeenCalledWith('uuid-123');
       expect(result).toEqual(updatedOrdem);
     });
 
@@ -241,24 +243,26 @@ describe('OrdensService', () => {
 
   describe('remove', () => {
     it('should remove an ordem permanently', async () => {
-      jest.spyOn(service, 'findOne').mockResolvedValue(mockOrdem);
+      const findOneSpy = jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue(mockOrdem);
       mockRepository.remove.mockResolvedValue(undefined);
 
       await service.remove('uuid-123');
 
-      expect(jest.spyOn(service, 'findOne')).toHaveBeenCalledWith('uuid-123');
+      expect(findOneSpy).toHaveBeenCalledWith('uuid-123');
       expect(mockRepository.remove).toHaveBeenCalledWith(mockOrdem);
     });
 
     it('should throw NotFoundException if ordem to remove not found', async () => {
-      jest.spyOn(service, 'findOne').mockRejectedValue(new NotFoundException());
+      const findOneSpy = jest
+        .spyOn(service, 'findOne')
+        .mockRejectedValue(new NotFoundException());
 
       await expect(service.remove('non-existent-id')).rejects.toThrow(
         NotFoundException,
       );
-      expect(jest.spyOn(service, 'findOne')).toHaveBeenCalledWith(
-        'non-existent-id',
-      );
+      expect(findOneSpy).toHaveBeenCalledWith('non-existent-id');
       expect(mockRepository.remove).not.toHaveBeenCalled();
     });
   });
@@ -272,15 +276,20 @@ describe('OrdensService', () => {
         responsavel_id: 'user-uuid-456',
       };
 
-      jest.spyOn(service, 'findOne').mockResolvedValue(ordemAberta);
-      jest.spyOn(service, 'update').mockResolvedValue(ordemEmAndamento);
+      const findOneSpy = jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue(ordemAberta);
+      const updateSpy = jest
+        .spyOn(service, 'update')
+        .mockResolvedValue(ordemEmAndamento);
 
       const result = await service.checkIn('uuid-123', 'user-uuid-456');
 
-      expect(jest.spyOn(service, 'findOne')).toHaveBeenCalledWith('uuid-123');
-      expect(jest.spyOn(service, 'update')).toHaveBeenCalledWith('uuid-123', {
+      expect(findOneSpy).toHaveBeenCalledWith('uuid-123');
+      expect(updateSpy).toHaveBeenCalledWith('uuid-123', {
         status: OrdemStatus.EM_ANDAMENTO,
         responsavel_id: 'user-uuid-456',
+        data_atualizacao: expect.any(Date),
       });
       expect(result.status).toBe(OrdemStatus.EM_ANDAMENTO);
       expect(result.responsavel_id).toBe('user-uuid-456');
@@ -288,22 +297,26 @@ describe('OrdensService', () => {
 
     it('should throw BadRequestException if ordem is already concluded', async () => {
       const ordemConcluida = { ...mockOrdem, status: OrdemStatus.CONCLUIDA };
-      jest.spyOn(service, 'findOne').mockResolvedValue(ordemConcluida);
+      const findOneSpy = jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue(ordemConcluida);
 
       await expect(
         service.checkIn('uuid-123', 'user-uuid-456'),
       ).rejects.toThrow(BadRequestException);
-      expect(jest.spyOn(service, 'findOne')).toHaveBeenCalledWith('uuid-123');
+      expect(findOneSpy).toHaveBeenCalledWith('uuid-123');
     });
 
     it('should throw BadRequestException if ordem is cancelled', async () => {
       const ordemCancelada = { ...mockOrdem, status: OrdemStatus.CANCELADA };
-      jest.spyOn(service, 'findOne').mockResolvedValue(ordemCancelada);
+      const findOneSpy = jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue(ordemCancelada);
 
       await expect(
         service.checkIn('uuid-123', 'user-uuid-456'),
       ).rejects.toThrow(BadRequestException);
-      expect(jest.spyOn(service, 'findOne')).toHaveBeenCalledWith('uuid-123');
+      expect(findOneSpy).toHaveBeenCalledWith('uuid-123');
     });
 
     it('should throw BadRequestException if ordem is already in progress', async () => {
@@ -311,12 +324,14 @@ describe('OrdensService', () => {
         ...mockOrdem,
         status: OrdemStatus.EM_ANDAMENTO,
       };
-      jest.spyOn(service, 'findOne').mockResolvedValue(ordemEmAndamento);
+      const findOneSpy = jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue(ordemEmAndamento);
 
       await expect(
         service.checkIn('uuid-123', 'user-uuid-456'),
       ).rejects.toThrow(BadRequestException);
-      expect(jest.spyOn(service, 'findOne')).toHaveBeenCalledWith('uuid-123');
+      expect(findOneSpy).toHaveBeenCalledWith('uuid-123');
     });
   });
 
@@ -333,13 +348,17 @@ describe('OrdensService', () => {
         data_conclusao: new Date(),
       };
 
-      jest.spyOn(service, 'findOne').mockResolvedValue(ordemEmAndamento);
-      jest.spyOn(service, 'update').mockResolvedValue(ordemConcluida);
+      const findOneSpy = jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue(ordemEmAndamento);
+      const updateSpy = jest
+        .spyOn(service, 'update')
+        .mockResolvedValue(ordemConcluida);
 
       const result = await service.checkOut('uuid-123', 'user-uuid-456');
 
-      expect(jest.spyOn(service, 'findOne')).toHaveBeenCalledWith('uuid-123');
-      expect(jest.spyOn(service, 'update')).toHaveBeenCalledWith('uuid-123', {
+      expect(findOneSpy).toHaveBeenCalledWith('uuid-123');
+      expect(updateSpy).toHaveBeenCalledWith('uuid-123', {
         status: OrdemStatus.CONCLUIDA,
         data_conclusao: expect.any(Date),
       });
@@ -349,32 +368,38 @@ describe('OrdensService', () => {
 
     it('should throw BadRequestException if ordem is already concluded', async () => {
       const ordemConcluida = { ...mockOrdem, status: OrdemStatus.CONCLUIDA };
-      jest.spyOn(service, 'findOne').mockResolvedValue(ordemConcluida);
+      const findOneSpy = jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue(ordemConcluida);
 
       await expect(
         service.checkOut('uuid-123', 'user-uuid-456'),
       ).rejects.toThrow(BadRequestException);
-      expect(jest.spyOn(service, 'findOne')).toHaveBeenCalledWith('uuid-123');
+      expect(findOneSpy).toHaveBeenCalledWith('uuid-123');
     });
 
     it('should throw BadRequestException if ordem is cancelled', async () => {
       const ordemCancelada = { ...mockOrdem, status: OrdemStatus.CANCELADA };
-      jest.spyOn(service, 'findOne').mockResolvedValue(ordemCancelada);
+      const findOneSpy = jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue(ordemCancelada);
 
       await expect(
         service.checkOut('uuid-123', 'user-uuid-456'),
       ).rejects.toThrow(BadRequestException);
-      expect(jest.spyOn(service, 'findOne')).toHaveBeenCalledWith('uuid-123');
+      expect(findOneSpy).toHaveBeenCalledWith('uuid-123');
     });
 
     it('should throw BadRequestException if ordem is not in progress', async () => {
       const ordemAberta = { ...mockOrdem, status: OrdemStatus.ABERTA };
-      jest.spyOn(service, 'findOne').mockResolvedValue(ordemAberta);
+      const findOneSpy = jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue(ordemAberta);
 
       await expect(
         service.checkOut('uuid-123', 'user-uuid-456'),
       ).rejects.toThrow(BadRequestException);
-      expect(jest.spyOn(service, 'findOne')).toHaveBeenCalledWith('uuid-123');
+      expect(findOneSpy).toHaveBeenCalledWith('uuid-123');
     });
 
     it('should throw ForbiddenException if user is not the responsible', async () => {
@@ -383,12 +408,14 @@ describe('OrdensService', () => {
         status: OrdemStatus.EM_ANDAMENTO,
         responsavel_id: 'user-uuid-999',
       };
-      jest.spyOn(service, 'findOne').mockResolvedValue(ordemEmAndamento);
+      const findOneSpy = jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue(ordemEmAndamento);
 
       await expect(
         service.checkOut('uuid-123', 'user-uuid-456'),
       ).rejects.toThrow(ForbiddenException);
-      expect(jest.spyOn(service, 'findOne')).toHaveBeenCalledWith('uuid-123');
+      expect(findOneSpy).toHaveBeenCalledWith('uuid-123');
     });
 
     it('should allow check out if user is the responsible', async () => {
@@ -403,11 +430,20 @@ describe('OrdensService', () => {
         data_conclusao: new Date(),
       };
 
-      jest.spyOn(service, 'findOne').mockResolvedValue(ordemEmAndamento);
-      jest.spyOn(service, 'update').mockResolvedValue(ordemConcluida);
+      const findOneSpy = jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue(ordemEmAndamento);
+      const updateSpy = jest
+        .spyOn(service, 'update')
+        .mockResolvedValue(ordemConcluida);
 
       const result = await service.checkOut('uuid-123', 'user-uuid-456');
 
+      expect(findOneSpy).toHaveBeenCalledWith('uuid-123');
+      expect(updateSpy).toHaveBeenCalledWith('uuid-123', {
+        status: OrdemStatus.CONCLUIDA,
+        data_conclusao: expect.any(Date),
+      });
       expect(result.status).toBe(OrdemStatus.CONCLUIDA);
       expect(result.data_conclusao).toBeDefined();
     });

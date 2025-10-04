@@ -67,6 +67,7 @@ export class OrdensService {
     return this.update(ordemId, {
       status: OrdemStatus.EM_ANDAMENTO,
       responsavel_id: userId,
+      data_atualizacao: new Date(),
     });
   }
 
