@@ -57,7 +57,7 @@ export class UsersService {
   async findByEmail(email: string): Promise<User | null> {
     return this.usersRepository.findOne({
       where: { email },
-      select: ['id', 'nome', 'email', 'senha', 'role', 'ativo', 'refreshToken'],
+      select: ['id', 'nome', 'email', 'senha', 'role', 'ativo'],
     });
   }
 
@@ -76,19 +76,6 @@ export class UsersService {
 
     Object.assign(user, updateUserDto);
     return this.usersRepository.save(user);
-  }
-
-  async updateRefreshToken(
-    userId: string,
-    refreshToken: string | null,
-  ): Promise<void> {
-    const hashedToken = refreshToken
-      ? await bcrypt.hash(refreshToken, 10)
-      : null;
-
-    await this.usersRepository.update(userId, {
-      refreshToken: hashedToken as string,
-    });
   }
 
   async remove(id: string): Promise<void> {

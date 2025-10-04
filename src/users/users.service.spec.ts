@@ -21,7 +21,6 @@ describe('UsersService', () => {
     senha: 'hashed-password',
     role: UserRole.AGENT,
     ativo: true,
-    refreshToken: null as string | null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ordensCriadas: [],
@@ -145,15 +144,7 @@ describe('UsersService', () => {
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { email: 'test@test.com' },
-        select: [
-          'id',
-          'nome',
-          'email',
-          'senha',
-          'role',
-          'ativo',
-          'refreshToken',
-        ],
+        select: ['id', 'nome', 'email', 'senha', 'role', 'ativo'],
       });
       expect(result).toEqual(mockUser);
     });
@@ -220,31 +211,6 @@ describe('UsersService', () => {
 
       expect(result).toEqual(mockUser);
       expect(mockRepository.findOne).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('updateRefreshToken', () => {
-    it('should update refresh token with hashed value', async () => {
-      const token = 'refresh-token';
-      const hashedToken = 'hashed-refresh-token';
-
-      jest.spyOn(bcrypt, 'hash').mockResolvedValue(hashedToken as never);
-
-      await service.updateRefreshToken('uuid-123', token);
-
-      expect(bcrypt.hash).toHaveBeenCalledWith(token, 10);
-      expect(mockRepository.update).toHaveBeenCalledWith('uuid-123', {
-        refreshToken: hashedToken,
-      });
-    });
-
-    it('should set refresh token to null when clearing', async () => {
-      await service.updateRefreshToken('uuid-123', null);
-
-      expect(bcrypt.hash).not.toHaveBeenCalled();
-      expect(mockRepository.update).toHaveBeenCalledWith('uuid-123', {
-        refreshToken: null,
-      });
     });
   });
 

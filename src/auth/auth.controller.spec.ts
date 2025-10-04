@@ -12,10 +12,6 @@ jest.mock('./guards/jwt-auth.guard', () => ({
   JwtAuthGuard: class MockJwtAuthGuard {},
 }));
 
-jest.mock('./guards/jwt-refresh.guard', () => ({
-  JwtRefreshGuard: class MockJwtRefreshGuard {},
-}));
-
 jest.mock('./decorators/current-user.decorator', () => ({
   CurrentUser: () => (): void => {},
 }));
@@ -32,7 +28,6 @@ describe('AuthController', () => {
     senha: 'hashed-password',
     role: UserRole.AGENT,
     ativo: true,
-    refreshToken: 'hashed-refresh-token',
     createdAt: new Date(),
     updatedAt: new Date(),
     ordensCriadas: [],
@@ -41,30 +36,18 @@ describe('AuthController', () => {
 
   const mockAuthResponse = {
     access_token: 'access-token',
-    refresh_token: 'refresh-token',
-    user: {
-      id: 'uuid-123',
-      nome: 'Test User',
-      email: 'test@test.com',
-      role: UserRole.AGENT,
-      ativo: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
   };
 
   const mockAuthService = {
     register: jest.fn(),
     login: jest.fn(),
     refreshToken: jest.fn(),
-    logout: jest.fn(),
   };
 
   const mockUsersService = {
     findByEmail: jest.fn(),
     create: jest.fn(),
     findOne: jest.fn(),
-    updateRefreshToken: jest.fn(),
   };
 
   const mockResponse = {
@@ -99,7 +82,7 @@ describe('AuthController', () => {
   });
 
   describe('register', () => {
-    it('should register a new user and set refresh token cookie', async () => {
+    it('should register a new user', async () => {
       const registerDto: RegisterDto = {
         nome: 'New User',
         email: 'new@test.com',
@@ -107,26 +90,25 @@ describe('AuthController', () => {
         role: UserRole.VIEWER,
       };
 
-      mockAuthService.register.mockResolvedValue(mockAuthResponse);
+      const mockUser = {
+        id: 'uuid-456',
+        nome: 'New User',
+        email: 'new@test.com',
+        senha: 'hashed-password',
+        role: UserRole.VIEWER,
+        ativo: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ordensCriadas: [],
+        ordensResponsavel: [],
+      } as User;
+
+      mockAuthService.register.mockResolvedValue(mockUser);
 
       const result = await controller.register(registerDto, mockResponse);
 
       expect(authService.register).toHaveBeenCalledWith(registerDto);
-      expect(mockResponse.cookie).toHaveBeenCalledWith(
-        'refresh_token',
-        'refresh-token',
-        {
-          httpOnly: true,
-          secure: false,
-          sameSite: 'strict',
-          maxAge: 7 * 24 * 60 * 60 * 1000,
-        },
-      );
-      expect(result).toEqual({
-        access_token: 'access-token',
-        user: mockAuthResponse.user,
-      });
-      expect(result).not.toHaveProperty('refresh_token');
+      expect(result).toEqual(mockUser);
     });
 
     it('should handle register errors', async () => {
@@ -144,7 +126,6 @@ describe('AuthController', () => {
         controller.register(registerDto, mockResponse),
       ).rejects.toThrow('Registration failed');
       expect(authService.register).toHaveBeenCalledWith(registerDto);
-      expect(mockResponse.cookie).not.toHaveBeenCalled();
     });
   });
 
@@ -155,26 +136,32 @@ describe('AuthController', () => {
         senha: 'password123',
       };
 
-      mockAuthService.login.mockResolvedValue(mockAuthResponse);
+      mockAuthService.login.mockImplementation((dto, res) => {
+        res.cookie('refresh_token', 'mock-refresh-token', {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'strict',
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+          path: '/',
+        });
+        return mockAuthResponse;
+      });
 
       const result = await controller.login(loginDto, mockResponse);
 
-      expect(authService.login).toHaveBeenCalledWith(loginDto);
+      expect(authService.login).toHaveBeenCalledWith(loginDto, mockResponse);
       expect(mockResponse.cookie).toHaveBeenCalledWith(
         'refresh_token',
-        'refresh-token',
+        'mock-refresh-token',
         {
           httpOnly: true,
-          secure: false,
+          secure: true,
           sameSite: 'strict',
           maxAge: 7 * 24 * 60 * 60 * 1000,
+          path: '/',
         },
       );
-      expect(result).toEqual({
-        access_token: 'access-token',
-        user: mockAuthResponse.user,
-      });
-      expect(result).not.toHaveProperty('refresh_token');
+      expect(result).toEqual(mockAuthResponse);
     });
 
     it('should handle login errors', async () => {
@@ -189,13 +176,13 @@ describe('AuthController', () => {
       await expect(controller.login(loginDto, mockResponse)).rejects.toThrow(
         'Invalid credentials',
       );
-      expect(authService.login).toHaveBeenCalledWith(loginDto);
+      expect(authService.login).toHaveBeenCalledWith(loginDto, mockResponse);
       expect(mockResponse.cookie).not.toHaveBeenCalled();
     });
   });
 
   describe('refresh', () => {
-    it('should refresh access token', async () => {
+    it('should refresh access token', () => {
       const mockRequest = {
         cookies: {
           refresh_token: 'refresh-token',
@@ -206,18 +193,15 @@ describe('AuthController', () => {
         access_token: 'new-access-token',
       };
 
-      mockAuthService.refreshToken.mockResolvedValue(refreshResult);
+      mockAuthService.refreshToken.mockReturnValue(refreshResult);
 
-      const result = await controller.refresh(mockUser, mockRequest);
+      const result = controller.refresh(mockRequest);
 
-      expect(authService.refreshToken).toHaveBeenCalledWith(
-        'uuid-123',
-        'refresh-token',
-      );
+      expect(authService.refreshToken).toHaveBeenCalledWith(mockRequest);
       expect(result).toEqual(refreshResult);
     });
 
-    it('should handle refresh errors', async () => {
+    it('should handle refresh errors', () => {
       const mockRequest = {
         cookies: {
           refresh_token: 'invalid-refresh-token',
@@ -225,35 +209,30 @@ describe('AuthController', () => {
       } as any;
 
       const error = new Error('Invalid refresh token');
-      mockAuthService.refreshToken.mockRejectedValue(error);
+      mockAuthService.refreshToken.mockImplementation(() => {
+        throw error;
+      });
 
-      await expect(controller.refresh(mockUser, mockRequest)).rejects.toThrow(
+      expect(() => controller.refresh(mockRequest)).toThrow(
         'Invalid refresh token',
       );
-      expect(authService.refreshToken).toHaveBeenCalledWith(
-        'uuid-123',
-        'invalid-refresh-token',
-      );
+      expect(authService.refreshToken).toHaveBeenCalledWith(mockRequest);
     });
 
-    it('should handle missing refresh token in cookies', async () => {
+    it('should handle missing refresh token in cookies', () => {
       const mockRequest = {
         cookies: {},
       } as any;
 
-      const refreshResult = {
-        access_token: 'new-access-token',
-      };
+      const error = new Error('No refresh token found');
+      mockAuthService.refreshToken.mockImplementation(() => {
+        throw error;
+      });
 
-      mockAuthService.refreshToken.mockResolvedValue(refreshResult);
-
-      const result = await controller.refresh(mockUser, mockRequest);
-
-      expect(authService.refreshToken).toHaveBeenCalledWith(
-        'uuid-123',
-        undefined,
+      expect(() => controller.refresh(mockRequest)).toThrow(
+        'No refresh token found',
       );
-      expect(result).toEqual(refreshResult);
+      expect(authService.refreshToken).toHaveBeenCalledWith(mockRequest);
     });
   });
 
@@ -273,92 +252,15 @@ describe('AuthController', () => {
         ordensResponsavel: [],
       });
       expect(result).not.toHaveProperty('senha');
-      expect(result).not.toHaveProperty('refreshToken');
-    });
-
-    it('should handle user with null refreshToken', () => {
-      const userWithoutRefreshToken = {
-        ...mockUser,
-        refreshToken: null,
-      } as unknown as User;
-
-      const result = controller.getProfile(userWithoutRefreshToken);
-
-      expect(result).not.toHaveProperty('senha');
-      expect(result).not.toHaveProperty('refreshToken');
     });
   });
 
   describe('logout', () => {
-    it('should logout user and clear refresh token cookie', async () => {
-      mockAuthService.logout.mockResolvedValue(undefined);
+    it('should logout user and clear refresh token cookie', () => {
+      const result = controller.logout(mockResponse);
 
-      const result = await controller.logout(mockUser, mockResponse);
-
-      expect(authService.logout).toHaveBeenCalledWith('uuid-123');
       expect(mockResponse.clearCookie).toHaveBeenCalledWith('refresh_token');
       expect(result).toEqual({ message: 'Logout realizado com sucesso' });
-    });
-
-    it('should handle logout errors', async () => {
-      const error = new Error('Logout failed');
-      mockAuthService.logout.mockRejectedValue(error);
-
-      await expect(controller.logout(mockUser, mockResponse)).rejects.toThrow(
-        'Logout failed',
-      );
-      expect(authService.logout).toHaveBeenCalledWith('uuid-123');
-      expect(mockResponse.clearCookie).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('setRefreshTokenCookie', () => {
-    it('should set cookie with correct options in development', () => {
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'development';
-
-      const mockRes = {
-        cookie: jest.fn(),
-      } as unknown as Response;
-
-      (controller as any).setRefreshTokenCookie(mockRes, 'test-token');
-
-      expect(mockRes.cookie).toHaveBeenCalledWith(
-        'refresh_token',
-        'test-token',
-        {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'strict',
-          maxAge: 7 * 24 * 60 * 60 * 1000,
-        },
-      );
-
-      process.env.NODE_ENV = originalEnv;
-    });
-
-    it('should set cookie with secure option in production', () => {
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
-
-      const mockRes = {
-        cookie: jest.fn(),
-      } as unknown as Response;
-
-      (controller as any).setRefreshTokenCookie(mockRes, 'test-token');
-
-      expect(mockRes.cookie).toHaveBeenCalledWith(
-        'refresh_token',
-        'test-token',
-        {
-          httpOnly: true,
-          secure: false,
-          sameSite: 'strict',
-          maxAge: 7 * 24 * 60 * 60 * 1000,
-        },
-      );
-
-      process.env.NODE_ENV = originalEnv;
     });
   });
 
@@ -382,39 +284,52 @@ describe('AuthController', () => {
         },
       } as any;
 
-      mockAuthService.register.mockResolvedValue(mockAuthResponse);
+      const mockUser = {
+        id: 'uuid-456',
+        nome: 'Integration User',
+        email: 'integration@test.com',
+        senha: 'hashed-password',
+        role: UserRole.AGENT,
+        ativo: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ordensCriadas: [],
+        ordensResponsavel: [],
+      } as User;
+
+      mockAuthService.register.mockResolvedValue(mockUser);
       const registerResult = await controller.register(
         registerDto,
         mockResponse,
       );
-      expect(registerResult).not.toHaveProperty('refresh_token');
+      expect(registerResult).toEqual(mockUser);
 
-      mockAuthService.login.mockResolvedValue(mockAuthResponse);
-      const loginResult = await controller.login(loginDto, mockResponse);
-      expect(loginResult).toEqual({
-        access_token: 'access-token',
-        user: mockAuthResponse.user,
+      mockAuthService.login.mockImplementation((dto, res) => {
+        res.cookie('refresh_token', 'mock-refresh-token', {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'strict',
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+          path: '/',
+        });
+        return mockAuthResponse;
       });
-      expect(loginResult).not.toHaveProperty('refresh_token');
+      const loginResult = await controller.login(loginDto, mockResponse);
+      expect(loginResult).toEqual(mockAuthResponse);
 
       const refreshResult = { access_token: 'new-access-token' };
-      mockAuthService.refreshToken.mockResolvedValue(refreshResult);
-      const refreshResponse = await controller.refresh(mockUser, mockRequest);
+      mockAuthService.refreshToken.mockReturnValue(refreshResult);
+      const refreshResponse = controller.refresh(mockRequest);
       expect(refreshResponse).toEqual(refreshResult);
 
-      mockAuthService.logout.mockResolvedValue(undefined);
-      const logoutResult = await controller.logout(mockUser, mockResponse);
+      const logoutResult = controller.logout(mockResponse);
       expect(logoutResult).toEqual({ message: 'Logout realizado com sucesso' });
 
       expect(authService.register).toHaveBeenCalledWith(registerDto);
-      expect(authService.login).toHaveBeenCalledWith(loginDto);
-      expect(authService.refreshToken).toHaveBeenCalledWith(
-        'uuid-123',
-        'refresh-token',
-      );
-      expect(authService.logout).toHaveBeenCalledWith('uuid-123');
+      expect(authService.login).toHaveBeenCalledWith(loginDto, mockResponse);
+      expect(authService.refreshToken).toHaveBeenCalledWith(mockRequest);
 
-      expect(mockResponse.cookie).toHaveBeenCalledTimes(2);
+      expect(mockResponse.cookie).toHaveBeenCalledTimes(1);
       expect(mockResponse.clearCookie).toHaveBeenCalledWith('refresh_token');
     });
   });

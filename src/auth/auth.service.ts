@@ -1,7 +1,13 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { Request, Response } from 'express';
+import { User } from 'src/users/entities/user.entity';
 import { UsersService } from '../users/users.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
@@ -15,7 +21,7 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
 
-  async login(loginDto: LoginDto): Promise<AuthResponseDto> {
+  async login(loginDto: LoginDto, res: Response): Promise<AuthResponseDto> {
     const user = await this.usersService.findByEmail(loginDto.email);
 
     if (!user) {
@@ -32,44 +38,51 @@ export class AuthService {
       throw new UnauthorizedException('Usuário inativo');
     }
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role);
-    await this.usersService.updateRefreshToken(user.id, tokens.refresh_token);
-
-    const { senha, refreshToken, ...userWithoutSensitiveData } = user;
-
-    return {
-      ...tokens,
-      user: userWithoutSensitiveData,
-    };
-  }
-
-  async refreshToken(
-    userId: string,
-    refreshToken: string,
-  ): Promise<{ access_token: string }> {
-    const user = await this.usersService.findOne(userId);
-
-    if (!user || !user.refreshToken) {
-      throw new UnauthorizedException('Acesso negado');
-    }
-
-    const isRefreshTokenValid = await bcrypt.compare(
-      refreshToken,
-      user.refreshToken,
+    const { access_token, refresh_token } = await this.generateTokens(
+      user.id,
+      user.email,
+      user.role,
     );
 
-    if (!isRefreshTokenValid) {
-      throw new UnauthorizedException('Acesso negado');
-    }
-
-    const payload = { sub: user.id, email: user.email, role: user.role };
-    const access_token = this.jwtService.sign(payload);
+    res.cookie('refresh_token', refresh_token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
 
     return { access_token };
   }
 
-  async logout(userId: string): Promise<void> {
-    await this.usersService.updateRefreshToken(userId, null);
+  refreshToken(req: Request) {
+    try {
+      const refreshToken = req.cookies['refresh_token'];
+
+      if (!refreshToken) {
+        throw new UnauthorizedException('No refresh token found');
+      }
+
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      });
+
+      const newAccessToken = this.jwtService.sign(
+        {
+          email: payload.email,
+          role: payload.role,
+          sub: payload.sub,
+        },
+        {
+          secret: this.configService.get<string>('JWT_SECRET'),
+          expiresIn: this.configService.get<string>('JWT_EXPIRATION'),
+        },
+      );
+
+      return { access_token: newAccessToken };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
   }
 
   private async generateTokens(
@@ -94,19 +107,24 @@ export class AuthService {
     return { access_token, refresh_token };
   }
 
-  async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
-    const user = await this.usersService.create(registerDto);
+  async register(registerDto: RegisterDto): Promise<User> {
+    const { email, nome, role, senha } = registerDto;
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role);
-    await this.usersService.updateRefreshToken(user.id, tokens.refresh_token);
+    const existingUser = await this.usersService.findByEmail(email);
 
-    const userWithoutPassword = await this.usersService.findOne(user.id);
-    const { senha, refreshToken, ...userWithoutSensitiveData } =
-      userWithoutPassword;
+    if (existingUser) {
+      throw new ConflictException('Email já cadastrado');
+    }
 
-    return {
-      ...tokens,
-      user: userWithoutSensitiveData,
-    };
+    const hashedPassword = await bcrypt.hash(senha, 10);
+
+    const user = await this.usersService.create({
+      email,
+      nome,
+      role,
+      senha: hashedPassword,
+    });
+
+    return user;
   }
 }

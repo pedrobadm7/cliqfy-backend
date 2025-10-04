@@ -24,7 +24,6 @@ describe('AuthService', () => {
     senha: 'hashed-password',
     role: UserRole.AGENT,
     ativo: true,
-    refreshToken: 'hashed-refresh-token',
     createdAt: new Date(),
     updatedAt: new Date(),
     ordensCriadas: [],
@@ -35,13 +34,12 @@ describe('AuthService', () => {
     findByEmail: jest.fn(),
     create: jest.fn(),
     findOne: jest.fn(),
-    findOneWithRefreshToken: jest.fn(),
-    updateRefreshToken: jest.fn(),
   };
 
   const mockJwtService = {
     sign: jest.fn(),
     signAsync: jest.fn(),
+    verify: jest.fn(),
   };
 
   const mockConfigService = {
@@ -85,6 +83,10 @@ describe('AuthService', () => {
       senha: 'password123',
     };
 
+    const mockResponse = {
+      cookie: jest.fn(),
+    } as any;
+
     it('should login successfully with valid credentials', async () => {
       const tokens = {
         access_token: 'access-token',
@@ -96,9 +98,8 @@ describe('AuthService', () => {
         .spyOn(bcrypt, 'compare')
         .mockImplementation(() => Promise.resolve(true));
       jest.spyOn(service as any, 'generateTokens').mockResolvedValue(tokens);
-      mockUsersService.updateRefreshToken.mockResolvedValue(undefined);
 
-      const result = await service.login(loginDto);
+      const result = await service.login(loginDto, mockResponse);
 
       expect(mockUsersService.findByEmail).toHaveBeenCalledWith(loginDto.email);
       expect(bcrypt.compare).toHaveBeenCalledWith(
@@ -110,28 +111,26 @@ describe('AuthService', () => {
         mockUser.email,
         mockUser.role,
       );
-      expect(mockUsersService.updateRefreshToken).toHaveBeenCalledWith(
-        mockUser.id,
+      expect(mockResponse.cookie).toHaveBeenCalledWith(
+        'refresh_token',
         tokens.refresh_token,
+        {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'strict',
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+          path: '/',
+        },
       );
       expect(result).toEqual({
-        ...tokens,
-        user: expect.objectContaining({
-          id: mockUser.id,
-          nome: mockUser.nome,
-          email: mockUser.email,
-          role: mockUser.role,
-          ativo: mockUser.ativo,
-        }),
+        access_token: tokens.access_token,
       });
-      expect(result.user).not.toHaveProperty('senha');
-      expect(result.user).not.toHaveProperty('refreshToken');
     });
 
     it('should throw UnauthorizedException if user not found', async () => {
       mockUsersService.findByEmail.mockResolvedValue(null);
 
-      await expect(service.login(loginDto)).rejects.toThrow(
+      await expect(service.login(loginDto, mockResponse)).rejects.toThrow(
         UnauthorizedException,
       );
       expect(mockUsersService.findByEmail).toHaveBeenCalledWith(loginDto.email);
@@ -144,7 +143,7 @@ describe('AuthService', () => {
         .spyOn(bcrypt, 'compare')
         .mockImplementation(() => Promise.resolve(false));
 
-      await expect(service.login(loginDto)).rejects.toThrow(
+      await expect(service.login(loginDto, mockResponse)).rejects.toThrow(
         UnauthorizedException,
       );
       expect(mockUsersService.findByEmail).toHaveBeenCalledWith(loginDto.email);
@@ -161,7 +160,7 @@ describe('AuthService', () => {
         .spyOn(bcrypt, 'compare')
         .mockImplementation(() => Promise.resolve(true));
 
-      await expect(service.login(loginDto)).rejects.toThrow(
+      await expect(service.login(loginDto, mockResponse)).rejects.toThrow(
         UnauthorizedException,
       );
       expect(mockUsersService.findByEmail).toHaveBeenCalledWith(loginDto.email);
@@ -182,132 +181,97 @@ describe('AuthService', () => {
 
     it('should register a new user successfully', async () => {
       const newUser = { ...mockUser, ...registerDto };
-      const tokens = {
-        access_token: 'access-token',
-        refresh_token: 'refresh-token',
-      };
-      const userWithoutSensitiveData = {
-        id: newUser.id,
-        nome: newUser.nome,
-        email: newUser.email,
-        role: newUser.role,
-        ativo: newUser.ativo,
-        createdAt: newUser.createdAt,
-        updatedAt: newUser.updatedAt,
-        ordensCriadas: [],
-        ordensResponsavel: [],
-      };
 
+      mockUsersService.findByEmail.mockResolvedValue(null);
       mockUsersService.create.mockResolvedValue(newUser);
-      jest.spyOn(service as any, 'generateTokens').mockResolvedValue(tokens);
-      mockUsersService.updateRefreshToken.mockResolvedValue(undefined);
-      mockUsersService.findOne.mockResolvedValue(userWithoutSensitiveData);
+      jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed-password' as never);
 
       const result = await service.register(registerDto);
 
-      expect(mockUsersService.create).toHaveBeenCalledWith(registerDto);
-      expect(service['generateTokens']).toHaveBeenCalledWith(
-        newUser.id,
-        newUser.email,
-        newUser.role,
+      expect(mockUsersService.findByEmail).toHaveBeenCalledWith(
+        registerDto.email,
       );
-      expect(mockUsersService.updateRefreshToken).toHaveBeenCalledWith(
-        newUser.id,
-        tokens.refresh_token,
-      );
-      expect(mockUsersService.findOne).toHaveBeenCalledWith(newUser.id);
-      expect(result).toEqual({
-        ...tokens,
-        user: userWithoutSensitiveData,
+      expect(bcrypt.hash).toHaveBeenCalledWith(registerDto.senha, 10);
+      expect(mockUsersService.create).toHaveBeenCalledWith({
+        ...registerDto,
+        senha: 'hashed-password',
       });
+      expect(result).toEqual(newUser);
     });
   });
 
   describe('refreshToken', () => {
-    const userId = 'user-uuid-123';
-    const refreshToken = 'valid-refresh-token';
-
-    it('should refresh token successfully', async () => {
+    it('should refresh token successfully', () => {
       const accessToken = 'new-access-token';
-      const userWithRefreshToken = {
-        ...mockUser,
-        refreshToken: 'hashed-refresh-token',
-      };
+      const mockRequest = {
+        cookies: {
+          refresh_token: 'valid-refresh-token',
+        },
+      } as any;
 
-      mockUsersService.findOne.mockResolvedValue(userWithRefreshToken);
-      jest
-        .spyOn(bcrypt, 'compare')
-        .mockImplementation(() => Promise.resolve(true));
+      mockConfigService.get
+        .mockReturnValueOnce('jwt-refresh-secret')
+        .mockReturnValueOnce('jwt-secret')
+        .mockReturnValueOnce('1h');
+
+      mockJwtService.verify.mockReturnValue({
+        sub: 'user-uuid-123',
+        email: 'test@test.com',
+        role: UserRole.AGENT,
+      });
+
       mockJwtService.sign.mockReturnValue(accessToken);
 
-      const result = await service.refreshToken(userId, refreshToken);
+      const result = service.refreshToken(mockRequest);
 
-      expect(mockUsersService.findOne).toHaveBeenCalledWith(userId);
-      expect(bcrypt.compare).toHaveBeenCalledWith(
-        refreshToken,
-        userWithRefreshToken.refreshToken,
+      expect(mockJwtService.verify).toHaveBeenCalledWith(
+        'valid-refresh-token',
+        { secret: 'jwt-refresh-secret' },
       );
-      expect(mockJwtService.sign).toHaveBeenCalledWith({
-        sub: userWithRefreshToken.id,
-        email: userWithRefreshToken.email,
-        role: userWithRefreshToken.role,
-      });
+      expect(mockJwtService.sign).toHaveBeenCalledWith(
+        {
+          email: 'test@test.com',
+          role: UserRole.AGENT,
+          sub: 'user-uuid-123',
+        },
+        {
+          secret: 'jwt-secret',
+          expiresIn: '1h',
+        },
+      );
       expect(result).toEqual({ access_token: accessToken });
     });
 
-    it('should throw UnauthorizedException if user not found', async () => {
-      mockUsersService.findOne.mockResolvedValue(null);
+    it('should throw UnauthorizedException if no refresh token found', () => {
+      const mockRequest = {
+        cookies: {},
+      } as any;
 
-      await expect(service.refreshToken(userId, refreshToken)).rejects.toThrow(
+      expect(() => service.refreshToken(mockRequest)).toThrow(
         UnauthorizedException,
       );
-      expect(mockUsersService.findOne).toHaveBeenCalledWith(userId);
-      expect(bcrypt.compare).not.toHaveBeenCalled();
+      expect(() => service.refreshToken(mockRequest)).toThrow(
+        'Invalid refresh token',
+      );
     });
 
-    it('should throw UnauthorizedException if user has no refresh token', async () => {
-      const userWithoutRefreshToken = { ...mockUser, refreshToken: null };
-      mockUsersService.findOne.mockResolvedValue(userWithoutRefreshToken);
+    it('should throw UnauthorizedException if refresh token is invalid', () => {
+      const mockRequest = {
+        cookies: {
+          refresh_token: 'invalid-refresh-token',
+        },
+      } as any;
 
-      await expect(service.refreshToken(userId, refreshToken)).rejects.toThrow(
+      mockConfigService.get.mockReturnValue('jwt-refresh-secret');
+      mockJwtService.verify.mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
+
+      expect(() => service.refreshToken(mockRequest)).toThrow(
         UnauthorizedException,
       );
-      expect(mockUsersService.findOne).toHaveBeenCalledWith(userId);
-      expect(bcrypt.compare).not.toHaveBeenCalled();
-    });
-
-    it('should throw UnauthorizedException if refresh token is invalid', async () => {
-      const userWithRefreshToken = {
-        ...mockUser,
-        refreshToken: 'hashed-refresh-token',
-      };
-      mockUsersService.findOne.mockResolvedValue(userWithRefreshToken);
-      jest
-        .spyOn(bcrypt, 'compare')
-        .mockImplementation(() => Promise.resolve(false));
-
-      await expect(service.refreshToken(userId, refreshToken)).rejects.toThrow(
-        UnauthorizedException,
-      );
-      expect(mockUsersService.findOne).toHaveBeenCalledWith(userId);
-      expect(bcrypt.compare).toHaveBeenCalledWith(
-        refreshToken,
-        userWithRefreshToken.refreshToken,
-      );
-    });
-  });
-
-  describe('logout', () => {
-    const userId = 'user-uuid-123';
-
-    it('should logout successfully', async () => {
-      mockUsersService.updateRefreshToken.mockResolvedValue(undefined);
-
-      await service.logout(userId);
-
-      expect(mockUsersService.updateRefreshToken).toHaveBeenCalledWith(
-        userId,
-        null,
+      expect(() => service.refreshToken(mockRequest)).toThrow(
+        'Invalid refresh token',
       );
     });
   });
