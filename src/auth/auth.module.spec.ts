@@ -9,7 +9,6 @@ import { AuthService } from './auth.service';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
-// Mock do UsersModule para evitar dependências do TypeORM
 jest.mock('../users/users.module', () => ({
   UsersModule: {
     module: class MockUsersModule {},

@@ -56,7 +56,7 @@ export class AddUserRelationsToOrdem1759501139194
         columnNames: ['responsavel_id'],
         referencedTableName: 'user',
         referencedColumnNames: ['id'],
-        onDelete: 'SET NULL', // Se deletar user, ordem fica sem responsável
+        onDelete: 'SET NULL',
         onUpdate: 'CASCADE',
       }),
     );

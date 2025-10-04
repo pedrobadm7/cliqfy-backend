@@ -6,7 +6,6 @@ import { Ordem, OrdemStatus } from './entities/ordem.entity';
 import { OrdensController } from './ordens.controller';
 import { OrdensService } from './ordens.service';
 
-// Mock dos módulos de auth antes de importar o controller
 jest.mock('../auth/decorators/roles.decorator', () => ({
   Roles: () => () => {},
 }));

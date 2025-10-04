@@ -381,7 +381,7 @@ describe('OrdensService', () => {
       const ordemEmAndamento = {
         ...mockOrdem,
         status: OrdemStatus.EM_ANDAMENTO,
-        responsavel_id: 'user-uuid-999', // Different user
+        responsavel_id: 'user-uuid-999',
       };
       jest.spyOn(service, 'findOne').mockResolvedValue(ordemEmAndamento);
 
@@ -395,7 +395,7 @@ describe('OrdensService', () => {
       const ordemEmAndamento = {
         ...mockOrdem,
         status: OrdemStatus.EM_ANDAMENTO,
-        responsavel_id: 'user-uuid-456', // Same user
+        responsavel_id: 'user-uuid-456',
       };
       const ordemConcluida = {
         ...ordemEmAndamento,
