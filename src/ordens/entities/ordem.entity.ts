@@ -34,13 +34,13 @@ export class Ordem {
   })
   status: OrdemStatus;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamp with time zone' })
   data_criacao: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamp with time zone', nullable: true })
   data_atualizacao: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @UpdateDateColumn({ type: 'timestamp with time zone', nullable: true })
   data_conclusao: Date;
 
   @Column()

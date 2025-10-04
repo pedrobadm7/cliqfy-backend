@@ -12,4 +12,7 @@ export default new DataSource({
   entities: [Ordem, User],
   migrations: ['src/database/migrations/**/*.ts'],
   synchronize: false,
+  extra: {
+    timezone: 'America/Sao_Paulo',
+  },
 });
